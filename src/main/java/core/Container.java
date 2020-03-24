@@ -1,13 +1,16 @@
 package core;
 
+import annotations.Inject;
+import app.armot.Application;
 import config.Const;
-import loader.ModuleLoader;
 import structure.ApplicationConfig;
 import structure.Module;
 import structure.ModuleConfig;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * @author Cai2yy
@@ -16,21 +19,49 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class Container {
 
-    Map<String, Module> moduleMap ;
-
+    @Inject
     ModuleLoader moduleLoader;
 
-    public Container(ApplicationConfig config) {
-        String moduleName = config.getModuleName();
-        this.moduleMap = new ConcurrentHashMap<>();
-        System.out.println("生成新的");
-        this.moduleLoader = new ModuleLoader();
+    // 懒加载
+    Map<String, Module> moduleMap;
 
+    ApplicationConfig applicationConfig;
+
+    public void setApplicationConfig(ApplicationConfig applicationConfig) {
+        this.applicationConfig = applicationConfig;
+        this.moduleLoader.setApplicationConfig(applicationConfig);
+    }
+
+    // 构造器初始化
+    ExecutorService threadPoolExecutor;
+
+
+    /**
+     * 初始化外部容器
+     * @param
+     * @return
+     */
+    public Container() {
+        this.threadPoolExecutor = Executors.newFixedThreadPool(18);
+        /*
+        String moduleName = applicationConfig.getModuleName();
+        this.moduleMap = new ConcurrentHashMap<>();
+        this.moduleLoader = new ModuleLoader();
+        this.threadPoolExecutor = Executors.newFixedThreadPool(10);
         //从配置文件读
         ModuleConfig moduleConfig = new ModuleConfig(Const.modulePath1);
+        ModuleConfig moduleConfig2 = new ModuleConfig(Const.modulePath2);
+        String module2Name = "webapp";
 
         this.moduleMap.put(moduleName, moduleLoader.load(moduleConfig));
-        initHotDeploy();
+        this.moduleMap.put(module2Name, moduleLoader.load(moduleConfig2));
+
+         */
+
+    }
+
+    public void initModules() {
+        this.moduleMap = moduleLoader.loadModules();
     }
 
     /**
@@ -40,7 +71,9 @@ public class Container {
      * @return
      */
     public void initHotDeploy() {
-        Thread thread = new Thread(new Runnable() {
+
+        // 让一个线程循环监听是否有模块发生变化
+        threadPoolExecutor.execute(new Runnable() {
             @Override
             public void run() {
                 while (true) {
@@ -50,83 +83,25 @@ public class Container {
                         e.printStackTrace();
                     }
                     Module module = null;
+                    System.out.println("有几个程序：" + moduleMap.size());
                     for (String moduleName : moduleMap.keySet()) {
                         module = moduleMap.get(moduleName);
                         // 如果模块程序文件被更新，则重加载模块
-                        if (moduleLoader.checkModified(module)) {
-                            module = moduleLoader.load(module.getModuleConfig());
-                            moduleMap.put(moduleName, module);
+                        if (moduleLoader.checkModified(moduleName, module)) {
+                            System.out.println(moduleName + "这个程序被更改过");
+                            Module finalModule = module;
+                            threadPoolExecutor.execute(new Runnable() {
+                                @Override
+                                public void run() {
+                                    moduleMap.put(moduleName, moduleLoader.load(finalModule.getModuleConfig()).getModule());
+                                }
+                            });
                         }
                     }
                 }
             }
         });
-        thread.start();
     }
 
-    /*
-    public void refresh() {
-        synchronized(this) {
-            this.prepareRefresh();
-            // 获取新的BeanFactory，销毁原有BeanFactory
-            ConfigurableListableBeanFactory beanFactory = this.obtainFreshBeanFactory();
-            // 为BeanFactory进行必要的准备工作
-            this.prepareBeanFactory(beanFactory);
-
-            try {
-                // 额外后处理
-                this.postProcessBeanFactory(beanFactory);
-                // 执行BeanFactoryPostProcessor的回调
-                this.invokeBeanFactoryPostProcessors(beanFactory);
-                // 注册所有BeanPostProcessor
-                this.registerBeanPostProcessors(beanFactory);
-                // 初始化信息资源
-                this.initMessageSource();
-                // 初始化时间多播器
-                this.initApplicationEventMulticaster();
-                // 正在刷新
-                this.onRefresh();
-                // 注册所有ApplicationListener
-                this.registerListeners();
-                // 完成BeanFactory的初始化流程
-                this.finishBeanFactoryInitialization(beanFactory);
-                // 完成刷新
-                this.finishRefresh();
-            } catch (BeansException var9) {
-                if (this.logger.isWarnEnabled()) {
-                    this.logger.warn("Exception encountered during context initialization - cancelling refresh attempt: " + var9);
-                }
-                // 若失败则清理资源
-                this.destroyBeans();
-                this.cancelRefresh(var9);
-                throw var9;
-            } finally {
-                this.resetCommonCaches();
-            }
-
-        }
-    }
-
-    protected final void refreshBeanFactory() throws BeansException {
-        // 如果有Bean先销毁
-        if (this.hasBeanFactory()) {
-            this.destroyBeans();
-            this.closeBeanFactory();
-        }
-
-        try {
-            DefaultListableBeanFactory beanFactory = this.createBeanFactory();
-            beanFactory.setSerializationId(this.getId());
-            this.customizeBeanFactory(beanFactory);
-            this.loadBeanDefinitions(beanFactory);
-            synchronized(this.beanFactoryMonitor) {
-                this.beanFactory = beanFactory;
-            }
-        } catch (IOException var5) {
-            throw new ApplicationContextException("I/O error parsing bean definition source for " + this.getDisplayName(), var5);
-        }
-    }
-
-     */
 
 }

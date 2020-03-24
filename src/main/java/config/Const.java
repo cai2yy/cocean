@@ -7,6 +7,7 @@ package config;
 
 public abstract class Const {
 
-    public static final String modulePath1 = "webapp/";
+    public static final String modulePath1 = "app/armot/";
+    public static final String modulePath2 = "webapp";
 
 }

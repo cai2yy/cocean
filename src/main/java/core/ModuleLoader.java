@@ -1,13 +1,15 @@
-package loader;
+package core;
 
+import annotations.Inject;
 import context.ApplicationContext;
 import context.ModuleApplicationContext;
-import core.Injector;
+import loader.ModuleClassLoader;
+import structure.ApplicationConfig;
 import structure.Module;
 import structure.ModuleConfig;
 import utils.Scanner;
 
-import java.net.URL;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -18,36 +20,62 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class ModuleLoader implements Loader {
 
-    ApplicationContext applicationContext;
+    @Inject
+    EventBus eventBus;
 
-    Map<String, Long> classModifiedMap;
+    // 懒加载
+    ApplicationConfig applicationConfig;
+
+    public void setApplicationConfig(ApplicationConfig applicationConfig) {
+        this.applicationConfig = applicationConfig;
+    }
+
+    Map<String, Map<String, Long>> moduleClassModifiedMap;
+
+    /**
+     * 初始化外部容器，加载所有模块
+     * @param
+     * @return
+     */
+    public Map<String, Module> loadModules() {
+        Map<String, Module> modules = new ConcurrentHashMap<>();
+
+        List<ModuleConfig> moduleConfigs = applicationConfig.getModuleConfigList();
+        for (ModuleConfig moduleConfig : moduleConfigs) {
+            modules.put(moduleConfig.getModuleName(), load(moduleConfig).getModule());
+        }
+        return modules;
+    }
 
     @Override
-    public boolean checkModified(Module module) {
+    public boolean checkModified(String moduleName, Module module) {
         String path = module.getModulePath();
         path = Thread.currentThread().getContextClassLoader().getResource(path).getPath();
         // 第一次检查，初始化 类-修改时间 缓存
-        if (classModifiedMap == null) {
-            classModifiedMap = Scanner.getClassModifiedTime(path, null, true);
+        if (moduleClassModifiedMap == null) {
+            this.moduleClassModifiedMap = new ConcurrentHashMap<>();
+        }
+        if (!moduleClassModifiedMap.containsKey(moduleName)) {
+            moduleClassModifiedMap.put(moduleName, Scanner.getClassModifiedTime(path, null, true));
         }
         // 检查模块文件有没有被修改过
         else {
+            Map<String, Long> classModifiedMap = moduleClassModifiedMap.get(moduleName);
             Map<String, Long> tmpMap = Scanner.getClassModifiedTime(path, null, true);
-            System.out.println(tmpMap.size() + " vs " + classModifiedMap.size());
             if (tmpMap.size() != classModifiedMap.size()) {
                 // 类的数量不相同
-                this.classModifiedMap = tmpMap;
+                this.moduleClassModifiedMap.put(moduleName, tmpMap);
                 return true;
             }
             for (String key : tmpMap.keySet()) {
                 if (!classModifiedMap.containsKey(key)) {
                     // 类的数量不变，但有新增有移除
-                    this.classModifiedMap = tmpMap;
+                    this.moduleClassModifiedMap.put(moduleName, tmpMap);
                     return true;
                 }
                 if (!classModifiedMap.get(key).equals(tmpMap.get(key))) {
                     // 类的数量不变，有些类被更新了
-                    this.classModifiedMap = tmpMap;
+                    this.moduleClassModifiedMap.put(moduleName, tmpMap);
                     return true;
                 }
             }
@@ -63,12 +91,15 @@ public class ModuleLoader implements Loader {
      * @return
      */
     @Override
-    public Module load(ModuleConfig moduleConfig) {
-        String tmpFileURLs = moduleConfig.getModuleUrlPath();
+    public ModuleApplicationContext load(ModuleConfig moduleConfig) {
+        String tmpFileURLs = moduleConfig.getModuleName();
 
-        ApplicationContext applicationContext = loadModuleApplication(moduleConfig, tmpFileURLs);
+        ModuleApplicationContext applicationContext = loadModuleApplication(moduleConfig, tmpFileURLs);
 
-        return new Module(applicationContext, moduleConfig);
+        Module module = new Module(applicationContext, moduleConfig);
+        applicationContext.setModule(module);
+
+        return applicationContext;
 
     }
 
@@ -81,14 +112,23 @@ public class ModuleLoader implements Loader {
      */
     private ModuleApplicationContext loadModuleApplication(ModuleConfig moduleConfig, String FileURLs) {
         ClassLoader currentClassLoader = Thread.currentThread().getContextClassLoader();
-        // 创建新的模块加载器
+        // 创建新的子容器
         Injector injector = new Injector(FileURLs);
-        ClassLoader moduleClassLoader = injector.getClassLoader();
+
+        // 获取子容器对应的类加载器
+        ModuleClassLoader moduleClassLoader = (ModuleClassLoader) injector.getClassLoader();
+        // 注册类加载器到事件总线
+        moduleClassLoader.setEventBus(eventBus);
+        eventBus.addClassLoader(moduleConfig.getModuleName(), moduleClassLoader);
+
         // 切换到模块类加载器
         Thread.currentThread().setContextClassLoader(moduleClassLoader);
+
         // 重启模块（程序））
         ModuleApplicationContext moduleApplicationContext = new ModuleApplicationContext(injector);
+        moduleApplicationContext.setEventBus(eventBus);
         moduleApplicationContext.refresh();
+
         // 切换回原来的类加载器
         Thread.currentThread().setContextClassLoader(currentClassLoader);
 

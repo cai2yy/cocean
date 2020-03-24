@@ -1,6 +1,6 @@
 package structure;
 
-import java.net.URL;
+import config.Const;
 
 /**
  * @author Cai2yy
@@ -9,14 +9,14 @@ import java.net.URL;
 
 public class ModuleConfig {
 
-    private String ModulePath;
+    private String moduleName;
 
     public ModuleConfig(String packagePath) {
         //todo 从配置文件中读模块（程序）位置
-        this.ModulePath = packagePath;
+        this.moduleName = packagePath;
     }
 
-    public String getModuleUrlPath() {
-        return ModulePath;
+    public String getModuleName() {
+        return moduleName;
     }
 }

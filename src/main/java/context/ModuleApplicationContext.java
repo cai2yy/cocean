@@ -1,5 +1,7 @@
 package context;
 
+import annotations.Inject;
+import core.EventBus;
 import core.Injector;
 import structure.Module;
 import test.circle.A;
@@ -15,9 +17,26 @@ import java.util.Collection;
 
 public class ModuleApplicationContext extends AbstractApplicationContext {
 
+    // 外部容器的对象
+    EventBus eventBus;
+
+    public void setEventBus(EventBus eventBus) {
+        this.eventBus = eventBus;
+    }
+
+    // 子容器
+    Injector injector;
+
+    // 模块
     Module module;
 
-    Injector injector;
+    public Module getModule() {
+        return module;
+    }
+
+    public void setModule(Module module) {
+        this.module = module;
+    }
 
     public ModuleApplicationContext(Injector injector) {
         this.injector = injector;
@@ -66,8 +85,11 @@ public class ModuleApplicationContext extends AbstractApplicationContext {
                     break;
                 }
             }
+            if (method0 == null)
+                continue;
             try {
-                method0.invoke(injector.getInstance(clazz));
+                System.out.println("刷新程序，激活这个方法" + method0);
+                method0.invoke(injector.getInstance(clazz), EventBus.class, eventBus);
             } catch (Exception e) {
                 // ignored
             }

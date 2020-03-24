@@ -1,7 +1,6 @@
 package structure;
 
 import context.ApplicationContext;
-import context.ModuleApplicationContext;
 import core.Injector;
 
 /**
@@ -16,14 +15,14 @@ public class Module {
     Injector injector;
 
     public String getModulePath() {
-        return moduleConfig.getModuleUrlPath();
+        return moduleConfig.getModuleName();
     }
 
     public ModuleConfig getModuleConfig() {
         return moduleConfig;
     }
 
-    public Module(ApplicationContext context, ModuleConfig moduleConfig) {
+    public Module(ApplicationContext applicationContext, ModuleConfig moduleConfig) {
         this.moduleConfig = moduleConfig;
     }
 

@@ -1,5 +1,8 @@
 package loader;
 
+import annotations.Inject;
+import core.EventBus;
+import core.Injector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,6 +27,17 @@ import java.util.concurrent.ConcurrentHashMap;
  * @date 2020/3/21 16:36
  */
 public class ModuleClassLoader extends URLClassLoader {
+
+    // 外部容器对象
+    public EventBus eventBus;
+
+    public EventBus getEventBus() {
+        return eventBus;
+    }
+
+    public void setEventBus(EventBus eventBus) {
+        this.eventBus = eventBus;
+    }
 
     ClassLoader JavaSystemClassLoader = getPlatformClassLoader();
 
@@ -87,7 +101,7 @@ public class ModuleClassLoader extends URLClassLoader {
             // (0.5) 查找是否已加载过
             clazz = findLoadedClass(name);
             if (clazz != null) {
-                System.out.println(name  + "已经被加载过了");
+                //System.out.println(name  + "已经被加载过了");
                 return clazz;
             }
             else {
@@ -109,10 +123,11 @@ public class ModuleClassLoader extends URLClassLoader {
             if (LOGGER.isDebugEnabled())
                 LOGGER.debug("  Searching local repositories");
             try {
-                // 这一步有时候（在初始化，加载第一个类时）会卡很久
+                //todo 这一步有时候（在初始化，加载第一个类时）会卡很久
+                //System.out.println("尝试自己加载>> " + clazz);
                 clazz = findClass(name);
                 if (clazz != null) {
-                    System.out.println("自己加载成功>> " + clazz);
+                    //System.out.println("自己加载成功>> " + clazz);
                     if (LOGGER.isDebugEnabled())
                         LOGGER.debug("  Loading class from local repository");
                     if (resolve)

@@ -3,6 +3,7 @@ package webapp;
 import annotations.Init;
 import annotations.Inject;
 import annotations.Singleton;
+import core.Injector;
 import test.mvc.service.UserService;
 
 import java.util.Timer;
@@ -20,7 +21,8 @@ public class Main {
 
     @Init
     public void init() {
-        System.out.println("253个webApp启动了" + System.nanoTime());
+        System.out.println("再来");
+        System.out.println("777个webApp启动了" + System.nanoTime());
         userService.addUser();
     }
 

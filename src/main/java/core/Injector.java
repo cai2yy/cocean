@@ -1,5 +1,6 @@
 package core;
 
+import annotations.Inject;
 import exception.InjectException;
 import loader.ModuleClassLoader;
 import structure.ModuleConfig;
@@ -14,65 +15,80 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 /**
- * 连锁注入:
- * 1. 通过getInstance()函数或连锁注入被注入的对象，其构造方法的参数也将被注入
- * 2. 构造类的参数符合注入条件的（@Inject)
- * 两种注入对象将被缓存:
- * 1. @Singleton，1个类->1个单例
- * 2. @Named("xx")，1个类（通常为接口)->N个名称->N个单例
- * 获取缓存对象(单例):
- * injector.getInstance(XX.class)
- * @time: 2020/2/15 0:38
+ * 理想的程序结构：
+ * 模块文件：			  ...workPath/
+ * 模块java文件编译后：  ...compiledPath/classes/
+ * 模块依赖jar包编译后： ...compiledPath/lib/
  */
 public class Injector {
 
+	private static Injector injector;
+
+	public static Injector getInjector() {
+		return injector;
+	}
+
+	// 关联唯一类加载器
 	public ClassLoader classLoader;
+
+	// 通过模块配置文件关联模块
 	public ModuleConfig moduleConfig;
 
+	// 单件缓存
 	private Map<Class<?>, Object> singletonInstances = new ConcurrentHashMap<>();
 
+	// 命名单件缓存
 	private Map<Class<?>, Map<Annotation, Object>> qualifiedInstances = new ConcurrentHashMap<>();
 	{
 		singletonInstances.put(Injector.class, this);
 	}
 
+	// 单件类表
 	private Map<Class<?>, Class<?>> singletonClasses = new ConcurrentHashMap<>();
 
 	public Collection<Class<?>> getCells() {
 		return singletonClasses.values();
 	}
 
+	// 命名单件类表
 	private Map<Class<?>, Map<Annotation, Class<?>>> qualifiedClasses = new ConcurrentHashMap<>();
 
+	// 解决循环注入的缓存
 	private Map<Class<?>, Object> earlyInstances = new ConcurrentHashMap<>();
 
+	// 几个常用注解的本地类加载器缓存
 	Class<? extends Annotation> namedAnno = null;
 	Class<? extends Annotation> singletonAnno = null;
 	Class<? extends Annotation> InjectAnno = null;
 
 	/**
-	 * 仅供测试使用
-	 * @param
-	 * @return
+	 * 不新建自定义类加载器
 	 */
 	public Injector() {
-		URL url = Thread.currentThread().getContextClassLoader().getResource("");
-		String classPath = url.getPath().substring(1);
-		this.classLoader = new ModuleClassLoader(new URL[] {url}, null, classPath);
-		scanAndLoadModule();
+		this.classLoader = ClassLoader.getSystemClassLoader();
+		scanAndLoadClasses();
+		injector = this;
 	}
 
 	/**
-	 * default construction
+	 * 构造器
+	 * @param urls 资源目录
 	 */
 	public Injector(URL[] urls) {
 		// packageName like "core/base"
 		String classPath = urls[0].getPath().substring(1);
 		String workPath = Thread.currentThread().getContextClassLoader().getResource("").getPath().substring(1);
 		this.classLoader = new ModuleClassLoader(urls, null, workPath);
-		scanAndLoadModule(classPath);
+		scanAndLoadClasses(classPath);
+
+		injector = this;
 	}
 
+	/**
+	 * 构造器
+	 * 从给定模块包名自动分析模块的绝对地址，并检索模块下的jar包绝对地址，合并作为资源目录构造类加载器
+	 * @param packageName 模块（程序）包名
+	 */
 	public Injector(String packageName) {
 		ClassLoader currentClassLoader = Thread.currentThread().getContextClassLoader();
 		String workPath = currentClassLoader.getResource("").getPath();
@@ -87,6 +103,7 @@ public class Injector {
 		int var1 = 0;
 		for (String catalog : classCatalog) {
 			try {
+				System.out.println("URL路径： " + catalog);
 				urls[var1++] = new URL("file:/" + catalog);
 			} catch (Exception e) {
 			}
@@ -95,12 +112,28 @@ public class Injector {
 
 		// 开始扫描并加载模块（包括jar包）中的类
 		String modulePath = workPath.concat(packageName);
-		if (classCatalog.size() > 1) {
-			scanAndLoadJars(classCatalog);
-		}
-		scanAndLoadModule(modulePath);
+		scanAndLoadClasses(modulePath);
+
+		injector = this;
 	}
 
+	/**
+	 * 扫描所有的jar包
+	 * 此处规定必须放在模块工作目录下的lib包内
+	 * @param packageName 包名
+	 * @return 模块内所有jar包的绝对路径的集合
+	 */
+	private List<String> scanJars(String packageName) {
+		String jarName = packageName.substring(0,
+				packageName.substring(0, packageName.length() - 1).lastIndexOf("classes")).concat("lib/");
+		//System.out.println("扫描lib: " + jarName);
+		return Scanner.getClassName(jarName, true);
+	}
+
+	/**
+	 * 扫描并加载jar包内所有类并加载到类加载器中
+	 * @param jarsList jar包绝对路径的集合
+	 */
 	public void scanAndLoadJars(List<String> jarsList) {
 		String jarPath = null;
 		for (int i = 0; i < jarsList.size() - 1; i++) {
@@ -108,8 +141,7 @@ public class Injector {
 			List<String> jarClassNames = Scanner.getClassNameByJar(jarPath, true);
 			for (String jarClass : jarClassNames) {
 				try {
-					System.out.println(jarClass);
-					Class<?> clazz = classLoader.loadClass(jarClass);
+					classLoader.loadClass(jarClass);
 				} catch (Exception e) {
 					// ignored
 				}
@@ -118,29 +150,10 @@ public class Injector {
 	}
 
 	/**
-	 * 扫描所有的jar包依赖
-	 * 此处规定必须放在工作目录下的lib包内
-	 * @param
-	 * @return
-	 */
-	private List<String> scanJars(String packageName) {
-		String jarName = packageName.substring(0,
-				packageName.substring(0, packageName.length() - 1).lastIndexOf('/') + 1).concat("lib/");
-		return Scanner.getClassName(jarName, true);
-	}
-
-	/**
-	 * scan (usually called at initiation) all workspace of projection
-	 */
-	public void scanAndLoadModule() {
-		scanAndLoadModule("");
-	}
-
-	/**
 	 * 扫描模块目录下的所有类并加载到自定义加载器中
-	 * @param modulePath the name of scanning root
+	 * @param modulePath 模块的绝对路径
 	 */
-	public void scanAndLoadModule(String modulePath) {
+	public void scanAndLoadClasses(String modulePath) {
 		// 切换类加载器
 		ClassLoader currentClassLoader = Thread.currentThread().getContextClassLoader();
 		Thread.currentThread().setContextClassLoader(classLoader);
@@ -157,6 +170,8 @@ public class Injector {
 				}
 			}
 		}
+
+		// 加载几个常用注解
 		try {
 			namedAnno = (Class<? extends Annotation>) classLoader.loadClass("annotations.Named");
 			singletonAnno = (Class<? extends Annotation>) classLoader.loadClass("annotations.Singleton");
@@ -164,7 +179,10 @@ public class Injector {
 		} catch (Exception e) {
 			// ignore
 		}
+
+		// 把加载的类注册到单例表和命名单例表中
 		for (Class<?> clazz : set) {
+			// 扫描类注解
 			Annotation[] annotations = clazz.getAnnotations();
 			Annotation namedAnnotation = null;
 			for (Annotation annotation : annotations) {
@@ -175,23 +193,32 @@ public class Injector {
 			if (namedAnnotation == null) {
 				continue;
 			}
-			Class<?>[] inters = clazz.getInterfaces();
-			for (Class<?> inter : inters) {
-				registerQualifiedClass(inter, namedAnnotation, clazz);
+			// 注册
+			if (clazz.isAnnotationPresent(namedAnno)) {
+				//System.out.println("注册到分类表" + clazz);
+				Class<?>[] inters = clazz.getInterfaces();
+				for (Class<?> inter : inters) {
+					registerQualifiedClass(inter, namedAnnotation, clazz);
+				}
 			}
-			if (inters.length == 0) {
+			if (clazz.isAnnotationPresent(singletonAnno)) {
+				//System.out.println("注册到类表");
 				registerSingletonClass(clazz, clazz);
 			}
 		}
-
+		// 切换回原来的类加载器
 		Thread.currentThread().setContextClassLoader(currentClassLoader);
 	}
 
+	public void scanAndLoadClasses() {
+		scanAndLoadClasses("");
+	}
+
 	/**
-	 *
-	 * @param clazz Class for putting in qualifiedInstances Dict
-	 * @param obj a instance for putting in qualifiedInstances Dict
-	 * @return this
+	 * 把生成的单件放入单件类表
+	 * @param clazz 单件的类型
+	 * @param obj 生成的单件实例
+	 * @return 注入器
 	 */
 	public <T> Injector putSingleton(Class<T> clazz, T obj) {
 		if (singletonInstances.put(clazz, obj) != null) {
@@ -201,12 +228,11 @@ public class Injector {
 	}
 
 	/**
-	 *
-	 * @param clazz Class for putting in qualifiedInstances Dict
-	 * @param annotation an annotation meeting JSR-330 qualified specification, which can be used to identify concrete
-	 *        implement when injection
-	 * @param obj a instance for putting in qualifiedInstances Dict
-	 * @return this
+	 * 把生成的单件放入命名单件类表
+	 * @param clazz 单件的类型
+	 * @param annotation 单件的注解，用来标注分类
+	 * @param obj 生成的单件实例
+	 * @return 注入器
 	 */
 	public <T> Injector putQualified(Class<T> clazz, Annotation annotation, T obj) {
 		if (!annotation.annotationType().isAnnotationPresent(namedAnno)) {
@@ -227,19 +253,20 @@ public class Injector {
 	}
 
 	/**
-	 *
-	 * @param clazz Class for registering in singletonClasses Dict
-	 * @return this
+	 * 注册单件
+	 * @param clazz 单件的类型
+	 * @return 注入器
 	 */
 	public <T> Injector registerSingletonClass(Class<T> clazz) {
 		return this.registerSingletonClass(clazz, clazz);
 	}
 
 	/**
-	 *
-	 * @param parentType a Class or an interface
-	 * @param clazz Class for registering in singletonClasses Dict
-	 * @return this
+	 * 注册单件
+	 * parentType为预留功能，通常在面向父类或接口时使用registerQualifiedClass方法
+	 * @param parentType 单件的父类或者接口
+	 * @param clazz 单件的类型
+	 * @return 注入器
 	 */
 	public <T> Injector registerSingletonClass(Class<?> parentType, Class<T> clazz) {
 		if (singletonClasses.put(parentType, clazz) != null) {
@@ -249,27 +276,11 @@ public class Injector {
 	}
 
 	/**
-	 *
-	 * @param parentType a Class or an interface
-	 * @param clazz Class for registering in qualifiedClasses Dict
-	 * @return this
-	 */
-	public <T> Injector registerQualifiedClass(Class<?> parentType, Class<T> clazz) {
-		for (Annotation anno : clazz.getAnnotations()) {
-			if (anno.annotationType().isAnnotationPresent(namedAnno)) {
-				return this.registerQualifiedClass(parentType, anno, clazz);
-			}
-		}
-		throw new InjectException("class should decorated with annotation tagged by Qualifier");
-	}
-
-	/**
-	 *
-	 * @param parentType a Class or an interface
-	 * @param annotation an annotation meeting JSR-330 qualified specification, which can be used to identify concrete
-	 * 	      implement when injection
-	 * @param clazz Class for registering in qualifiedClasses Dict
-	 * @return this
+	 * 注册命名单件
+	 * @param parentType 单件的父类或者接口
+	 * @param annotation 单件的注解，用来标注分类
+	 * @param clazz 单件的类型
+	 * @return 注入器
 	 */
 	public <T> Injector registerQualifiedClass(Class<?> parentType, Annotation annotation, Class<T> clazz) {
 		if (annotation.annotationType() != namedAnno) {
@@ -288,8 +299,17 @@ public class Injector {
 		return this;
 	}
 
+	public <T> Injector registerQualifiedClass(Class<?> parentType, Class<T> clazz) {
+		for (Annotation anno : clazz.getAnnotations()) {
+			if (anno.annotationType().isAnnotationPresent(namedAnno)) {
+				return this.registerQualifiedClass(parentType, anno, clazz);
+			}
+		}
+		throw new InjectException("class should decorated with annotation tagged by Qualifier");
+	}
+
 	/**
-	 * print qualifiedClasses dict for testing
+	 * 打印单件类表
 	 */
 	public void printSingletonClasses() {
 		for (Class<?> clazz : singletonClasses.keySet()) {
@@ -298,7 +318,7 @@ public class Injector {
 	}
 
 	/**
-	 * print qualifiedClasses dict for testing
+	 * 打印命名单件类表
 	 */
 	public void printQualifiedClasses() {
 		for (Class<?> clazz : qualifiedClasses.keySet()) {
@@ -310,7 +330,7 @@ public class Injector {
 	}
 
 	/**
-	 *
+	 * 从命名单件类表中创建
 	 * @param declaringClazz the Class calling this function
 	 * @param clazz Class type for creating new instance from qualifiedInstances or qualifiedClasses Dict
 	 * @param annotations annotation for identifying (usually by name) target corresponding clazz

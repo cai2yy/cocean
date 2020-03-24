@@ -75,17 +75,9 @@ public class Scanner {
                 fileNames = getClassNameByJar(url.getPath(), childPackage);
             }
         } else {
-            //todo 此处处理过于潦草
+            // 可能是包路径,按文件处理
             //fileNames = getClassNameByJars(((URLClassLoader) loader).getURLs(), packagePath, childPackage);
             fileNames = getClassNameByFile(packagePath, null, childPackage);
-            /*
-            if (!packagePath.substring(packagePath.length() - 8).equals("classes/")) {
-                for (int i = 0; i < fileNames.size(); i++) {
-                    fileNames.set(i, fileNames.get(i).substring(fileNames.get(i).indexOf(".") + 1));
-                }
-            }
-
-             */
         }
         return fileNames;
     }
@@ -127,12 +119,15 @@ public class Scanner {
 
     /**
      * 获取该文件目录及其子目录下.class文件的修改时间
-     * @param
-     * @return
+     * @param filePath 文件路径
+     * @param modifiedMap 文件修改时间缓存，递归用
+     * @param childPackage 是否遍历子包
+     * @return 文件修改时间的缓存哈希表
      */
     public static Map<String, Long> getClassModifiedTime(String filePath, Map<String, Long> modifiedMap, boolean childPackage) {
         Map<String, Long> classModifiedMap = new ConcurrentHashMap<>();
 
+        // 扫描路径下所有文件
         File file = new File(filePath);
         File[] childFiles = file.listFiles();
         if (childFiles == null) {
@@ -140,6 +135,7 @@ public class Scanner {
         }
         for (File childFile : childFiles) {
             if (childFile.isDirectory()) {
+                // 递归查找子目录
                 if (childPackage) {
                     Map<String, Long> tmpMap = getClassModifiedTime(childFile.getPath(), classModifiedMap, childPackage);
                     for (String name : tmpMap.keySet()) {
@@ -148,10 +144,10 @@ public class Scanner {
                 }
             } else {
                 String childFilePath = childFile.getPath();
-                System.out.println(childFilePath);
                 if (!(childFile.getPath().endsWith(".class") || childFilePath.endsWith(".jar"))) {
                     continue;
                 }
+                // 把文件最后修改时间加入结果集
                 classModifiedMap.put(childFilePath, childFile.lastModified());
             }
         }

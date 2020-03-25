@@ -11,8 +11,15 @@ import core.Injector;
 public class Module {
 
     ModuleConfig moduleConfig;
+    public String getModuleName() {
+        return moduleConfig.getModuleName();
+    }
 
     Injector injector;
+
+    public ClassLoader getClassLoader() {
+        return injector.getClassLoader();
+    }
 
     public String getModulePath() {
         return moduleConfig.getModuleName();

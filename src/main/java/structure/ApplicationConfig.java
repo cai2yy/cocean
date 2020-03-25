@@ -2,15 +2,16 @@ package structure;
 
 
 import annotations.Inject;
+import app.armot.Application;
 import config.Const;
+import context.ModuleApplicationContext;
 import core.Container;
 import core.EventBus;
-import core.ModuleLoader;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
 
 /**
  * @author Cai2yy
@@ -34,7 +35,32 @@ public class ApplicationConfig {
         this.test = test;
     }
 
-    List<ModuleConfig> moduleConfigList = new ArrayList<>();
+    List<ModuleApplicationContext> moduleApplicationContexts = new ArrayList<>();
+
+    public void addModuleApplicationContext(ModuleApplicationContext moduleApplicationContext) {
+        this.moduleApplicationContexts.add(moduleApplicationContext);
+    }
+
+    public Module getModule(String name) {
+        for (ModuleApplicationContext moduleApplicationContext : moduleApplicationContexts) {
+            if (name.equals(moduleApplicationContext.getModule().getModuleName())) {
+                return moduleApplicationContext.getModule();
+            }
+        }
+        return null;
+    }
+
+    public Map<String, ClassLoader> classLoaderMap = new ConcurrentHashMap<>();
+
+    public void addClassLoader(String name, ClassLoader classLoader) {
+        classLoaderMap.put(name, classLoader);
+    }
+
+    public Map<String, ClassLoader> getClassLoader() {
+        return classLoaderMap;
+    }
+
+    List<ModuleConfig> moduleConfigs = new ArrayList<>();
 
     public void initModuleConfigs() {
         String module1Name = "armot";
@@ -46,11 +72,11 @@ public class ApplicationConfig {
         List<ModuleConfig> res = new ArrayList<>();
         res.add(moduleConfig);
         res.add(moduleConfig2);
-        this.moduleConfigList = res;
+        this.moduleConfigs = res;
     }
 
-    public List<ModuleConfig> getModuleConfigList() {
-        return moduleConfigList;
+    public List<ModuleConfig> getModuleConfigs() {
+        return moduleConfigs;
     }
 
     public EventBus getEventBus() {

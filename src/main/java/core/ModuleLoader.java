@@ -1,7 +1,6 @@
 package core;
 
 import annotations.Inject;
-import context.ApplicationContext;
 import context.ModuleApplicationContext;
 import loader.ModuleClassLoader;
 import structure.ApplicationConfig;
@@ -38,9 +37,10 @@ public class ModuleLoader implements Loader {
      * @return
      */
     public Map<String, Module> loadModules() {
+        System.out.println("初始化，加载所有模块");
         Map<String, Module> modules = new ConcurrentHashMap<>();
 
-        List<ModuleConfig> moduleConfigs = applicationConfig.getModuleConfigList();
+        List<ModuleConfig> moduleConfigs = applicationConfig.getModuleConfigs();
         for (ModuleConfig moduleConfig : moduleConfigs) {
             modules.put(moduleConfig.getModuleName(), load(moduleConfig).getModule());
         }
@@ -92,14 +92,15 @@ public class ModuleLoader implements Loader {
      */
     @Override
     public ModuleApplicationContext load(ModuleConfig moduleConfig) {
+        System.out.println("加载模块: " + moduleConfig.getModuleName());
         String tmpFileURLs = moduleConfig.getModuleName();
 
-        ModuleApplicationContext applicationContext = loadModuleApplication(moduleConfig, tmpFileURLs);
+        ModuleApplicationContext moduleApplicationContext = loadModuleApplication(moduleConfig, tmpFileURLs);
 
-        Module module = new Module(applicationContext, moduleConfig);
-        applicationContext.setModule(module);
+        Module module = new Module(moduleApplicationContext, moduleConfig);
+        moduleApplicationContext.setModule(module);
 
-        return applicationContext;
+        return moduleApplicationContext;
 
     }
 
@@ -124,9 +125,14 @@ public class ModuleLoader implements Loader {
         // 切换到模块类加载器
         Thread.currentThread().setContextClassLoader(moduleClassLoader);
 
+
         // 重启模块（程序））
         ModuleApplicationContext moduleApplicationContext = new ModuleApplicationContext(injector);
+        moduleApplicationContext.setApplicationConfig(applicationConfig);
         moduleApplicationContext.setEventBus(eventBus);
+        //System.out.println("放入了一个模块" + moduleApplicationContext);
+        applicationConfig.addModuleApplicationContext(moduleApplicationContext);
+        applicationConfig.addClassLoader(moduleConfig.getModuleName(), moduleClassLoader);
         moduleApplicationContext.refresh();
 
         // 切换回原来的类加载器

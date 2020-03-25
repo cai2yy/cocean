@@ -3,12 +3,14 @@ package context;
 import annotations.Inject;
 import core.EventBus;
 import core.Injector;
+import structure.ApplicationConfig;
 import structure.Module;
 import test.circle.A;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.Collection;
+import java.util.Map;
 
 /**
  * @author Cai2yy
@@ -16,6 +18,13 @@ import java.util.Collection;
  */
 
 public class ModuleApplicationContext extends AbstractApplicationContext {
+
+    // 外部容器信息
+    ApplicationConfig applicationConfig;
+
+    public void setApplicationConfig(ApplicationConfig applicationConfig) {
+        this.applicationConfig = applicationConfig;
+    }
 
     // 外部容器的对象
     EventBus eventBus;
@@ -89,7 +98,10 @@ public class ModuleApplicationContext extends AbstractApplicationContext {
                 continue;
             try {
                 System.out.println("刷新程序，激活这个方法" + method0);
-                method0.invoke(injector.getInstance(clazz), EventBus.class, eventBus);
+                //Map<String, ClassLoader> classLoaderMap = applicationConfig.getClassLoader();
+                //System.out.println(classLoaderMap.size());
+                //method0.invoke(injector.getInstance(clazz), EventBus.class, eventBus);
+                method0.invoke(injector.getInstance(clazz));
             } catch (Exception e) {
                 // ignored
             }

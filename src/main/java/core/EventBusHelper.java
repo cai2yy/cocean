@@ -1,5 +1,7 @@
 package core;
 
+import app.armot.utils.MethodInterTest;
+
 import java.lang.reflect.Method;
 
 /**
@@ -37,6 +39,10 @@ public class EventBusHelper {
             System.out.println(method0.getName());
         }
         this.method = method0;
+    }
+
+    public void runMethod(MethodInterTest methodInterTest) {
+        methodInterTest.doMethod();
     }
 
     /**

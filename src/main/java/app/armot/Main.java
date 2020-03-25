@@ -9,11 +9,14 @@ import app.armot.core.ArmOT;
 import app.armot.server.RequestDispatcher;
 import app.armot.server.Router;
 import app.armot.server.internal.HttpServer;
+import app.armot.utils.MethodInterTest;
 import core.EventBus;
 import core.EventBusHelper;
 import loader.ModuleClassLoader;
+import loader.Test;
 
 import java.lang.reflect.Method;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -34,14 +37,28 @@ public class Main {
     @Inject
     RPCController rpcController;
 
+
     @Init
-    public void init(Class eventBus, Object eventBusObj) {
-        // 测试子容器与外部容器的通信
+    public void init() {
+        /*
+        测试子容器与外部容器的通信1
+        public void init(Map messenger){
+        System.out.println(messenger.getClass());
+        Map<String, ClassLoader> classLoaderMap = (Map<String, ClassLoader>) messenger;
+        for (String key : classLoaderMap.keySet()) {
+            System.out.println(key + " : " + classLoaderMap.get(key));
+        }
+
+        测试子容器与外部容器的通信2
+        public void init(Class eventBus, Object eventBusObj){
+
         EventBusHelper eventBusHelper = new EventBusHelper(eventBus, eventBusObj);
+        // 传入时间key，和1个 or 多个参数
         eventBusHelper.fireEvent("happen", "通信成功了");
+         */
 
         /** 1. (本地) 初始化必要组件 */
-        System.out.println("创建ArmOT``" + Thread.currentThread().getContextClassLoader());
+        System.out.println("创建ArmOT6666666" + Thread.currentThread().getContextClassLoader());
         armOT.asyncInit();
         System.out.println("主程序异步运行");
         //armOT.getDevices().put(0, new Device("XiaomiSwitch", 0));
@@ -73,6 +90,7 @@ public class Main {
         });
 
     }
+
 
     public void handler() {
         System.out.println("接收到了一个网络服务，并做出了响应");

@@ -3,7 +3,7 @@ COcean
 一个支持热加载的多功能程序容器
 > 现在将程序容器化部署已成为主流，本程序基于java的类加载器机制以及IOC + AOP框架，实现了多模块（程序）分隔部署
 > 
-> 容器支持热加载功能，开启后，当某个模块下的文件被修改，该程序会自动热重启，利于调试和维护
+> 容器支持热加载功能，开启后，当某个模块下的文件被修改，该模块会自动热重启，利于调试和维护
 > 
 > 此外，还支持跨模块的事件总线等功能，并提供了一个内置的http server模块用于快速部署web项目
 
@@ -56,7 +56,7 @@ https://github.com/cai2yy
 > https://github.com/cai2yy/armot
 - CJHttp: 基于netty实现的轻便web框架（http）
 > https://github.com/cai2yy/cjhttp
-- CJIoc：多功能的轻量级IOC框架
+- CJIoc：多~~~~功能的轻量级IOC框架
 > https://github.com/cai2yy/cjioc
 - CJEviter: 模仿node.js中eventEmitter类的JAVA实现
 > https://github.com/cai2yy/cjeviter

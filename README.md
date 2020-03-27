@@ -45,6 +45,15 @@ COcean
 >
 > 使用反射绕开类型转换，通过事件总线和提供的工具类，实现跨类加载器通信
 
+测试
+-- 
+1. 使用maven编译
+2. 运行maven的assembly插件
+3. 把得到的jar-with-dependencies.jar包放到target下的lib目录（如无则新建一个）
+4. 运行core.Bootstrap
+5. 运行过程中，可修改app.armot.Main和webapp.Main里的文件内容，然后用maven重新compile，程序会自动热重启（默认的扫描间隔是5s）
+> 注：部分内容（尤其是webapp.Main)受IDE缓存影响可能修改无法生效
+ 
   
 Cai2yy
 ---
